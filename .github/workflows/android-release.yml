@@ -3,12 +3,6 @@ name: Android Release Build
 on:
   push:
     branches: [main, master]
-    paths:
-      - "android/**"
-      - "app.json"
-      - "package.json"
-      - "babel.config.js"
-      - "metro.config.js"
   pull_request:
     branches: [main, master]
 
