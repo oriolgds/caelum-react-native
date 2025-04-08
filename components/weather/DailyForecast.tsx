@@ -1,8 +1,9 @@
-import React from 'react';
-import { StyleSheet, Text, View, FlatList } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, Text, View, FlatList, TouchableOpacity } from 'react-native';
 import { format, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { BlurView } from 'expo-blur';
+import { Ionicons } from '@expo/vector-icons';
 
 import { ForecastData } from '../../types/weather';
 import { WeatherIcon } from './WeatherIcon';
@@ -20,6 +21,7 @@ export const DailyForecast: React.FC<DailyForecastProps> = ({
 }) => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const [expandedDay, setExpandedDay] = useState<string | null>(null);
 
   if (isLoading || !forecastData) {
     return (
@@ -48,19 +50,59 @@ export const DailyForecast: React.FC<DailyForecastProps> = ({
       const date = new Date(item.dt * 1000);
       const day = format(date, 'yyyy-MM-dd');
       
+      // Extraer temperaturas según la estructura de datos
+      const tempMin = item.main?.temp_min || item.temp?.min || item.main?.temp;
+      const tempMax = item.main?.temp_max || item.temp?.max || item.main?.temp;
+      
+      // Extraer otros datos con valores por defecto
+      const pop = item.pop || 0;
+      const windSpeed = item.wind?.speed || item.wind_speed || 0;
+      const humidity = item.main?.humidity || item.humidity || 0;
+      const pressure = item.main?.pressure || item.pressure || 0;
+      const visibility = item.visibility || 10000;
+      
+      // Obtener el icono y la descripción
+      const weatherIcon = item.weather?.[0]?.icon || '01d';
+      const weatherDescription = item.weather?.[0]?.description || '';
+      
+      // Determinar si es de día o de noche basado en la hora
+      const hour = date.getHours();
+      const isDaytime = hour >= 6 && hour < 18;
+      
       if (!dailyMap.has(day)) {
         dailyMap.set(day, {
           date,
-          tempMin: item.main.temp_min,
-          tempMax: item.main.temp_max,
-          icon: item.weather[0].icon,
+          tempMin,
+          tempMax,
+          icon: weatherIcon,
+          description: weatherDescription,
+          pop,
+          windSpeed,
+          humidity,
+          pressure,
+          visibility,
+          isDaytime,
+          weatherCount: 1
         });
       } else {
         const current = dailyMap.get(day);
+        
+        // Actualizar el icono solo si es de día o si es el primer registro de la noche
+        const shouldUpdateIcon = isDaytime || (!current.isDaytime && current.weatherCount === 1);
+        
         dailyMap.set(day, {
           ...current,
-          tempMin: Math.min(current.tempMin, item.main.temp_min),
-          tempMax: Math.max(current.tempMax, item.main.temp_max),
+          tempMin: Math.min(current.tempMin, tempMin),
+          tempMax: Math.max(current.tempMax, tempMax),
+          pop: Math.max(current.pop, pop),
+          windSpeed: Math.max(current.windSpeed, windSpeed),
+          humidity: Math.max(current.humidity, humidity),
+          pressure: pressure,
+          visibility: visibility,
+          icon: shouldUpdateIcon ? weatherIcon : current.icon,
+          description: shouldUpdateIcon ? weatherDescription : current.description,
+          isDaytime: current.isDaytime || isDaytime,
+          weatherCount: current.weatherCount + 1
         });
       }
     });
@@ -71,46 +113,118 @@ export const DailyForecast: React.FC<DailyForecastProps> = ({
 
   const dailyData = getDailyData();
 
-  const renderDayItem = ({ item, index }: { item: ReturnType<typeof getDailyData>[0], index: number }) => {
-    const { date, tempMin, tempMax, icon } = item;
-    const dayName = isToday(date) 
+  const renderDayItem = ({ item, index }: { item: any, index: number }) => {
+    const dayName = isToday(item.date) 
       ? 'Hoy' 
-      : format(date, 'EEEE', { locale: es });
-    
-    const formattedDay = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+      : format(item.date, 'EEEE', { locale: es });
+    const formattedDay = format(item.date, 'd MMM', { locale: es });
+    const pop = Math.round(item.pop * 100);
+    const windSpeed = Math.round(item.windSpeed * 3.6);
+    const dayKey = format(item.date, 'yyyy-MM-dd');
+    const isExpanded = expandedDay === dayKey;
     
     return (
-      <View style={styles.dayItem}>
-        <Text 
+      <View>
+        <TouchableOpacity 
           style={[
-            styles.dayText, 
-            { color: isDark ? Colors.dark.text : Colors.light.text },
-            index === 0 && styles.todayText
+            styles.dayItem,
+            isExpanded && styles.expandedDayItem
           ]}
+          onPress={() => setExpandedDay(isExpanded ? null : dayKey)}
+          activeOpacity={0.7}
         >
+          <View style={styles.dayContent}>
+            <View style={styles.dayInfo}>
+              <Text style={[styles.dayName, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                {dayName}
+              </Text>
+              <Text style={[styles.date, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
           {formattedDay}
         </Text>
-        
-        <WeatherIcon iconCode={icon} size="small" showBackground />
-        
-        <View style={styles.tempRange}>
-          <Text 
-            style={[
-              styles.maxTemp, 
-              { color: isDark ? Colors.dark.text : Colors.light.text }
-            ]}
-          >
-            {Math.round(tempMax)}°
+            </View>
+
+            <View style={styles.weatherInfo}>
+              <WeatherIcon iconCode={item.icon} size="small" showBackground />
+              <View style={styles.tempContainer}>
+                <Text style={[styles.tempMin, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                  {Math.round(item.tempMin)}°
+                </Text>
+                <Text style={[styles.tempMax, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                  {Math.round(item.tempMax)}°
+                </Text>
+              </View>
+              <Ionicons 
+                name={isExpanded ? 'chevron-up' : 'chevron-down'} 
+                size={16} 
+                color={isDark ? Colors.dark.text : Colors.light.text} 
+              />
+            </View>
+          </View>
+        </TouchableOpacity>
+
+        {isExpanded && (
+          <View style={styles.detailsContainer}>
+            <View style={styles.detailRow}>
+              <View style={styles.detailItem}>
+                <Ionicons 
+                  name="water-outline" 
+                  size={14} 
+                  color={isDark ? Colors.dark.text : Colors.light.text} 
+                />
+                <Text style={[styles.detailText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                  {pop}% lluvia
+                </Text>
+              </View>
+              <View style={styles.detailItem}>
+                <Ionicons 
+                  name="wind-outline" 
+                  size={14} 
+                  color={isDark ? Colors.dark.text : Colors.light.text} 
+                />
+                <Text style={[styles.detailText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                  {windSpeed} km/h
+                </Text>
+              </View>
+              <View style={styles.detailItem}>
+                <Ionicons 
+                  name="water" 
+                  size={14} 
+                  color={isDark ? Colors.dark.text : Colors.light.text} 
+                />
+                <Text style={[styles.detailText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                  {item.humidity}%
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.detailRow}>
+              <View style={styles.detailItem}>
+                <Ionicons 
+                  name="speedometer-outline" 
+                  size={14} 
+                  color={isDark ? Colors.dark.text : Colors.light.text} 
+                />
+                <Text style={[styles.detailText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                  {item.pressure} hPa
+                </Text>
+              </View>
+              <View style={styles.detailItem}>
+                <Ionicons 
+                  name="eye-outline" 
+                  size={14} 
+                  color={isDark ? Colors.dark.text : Colors.light.text} 
+                />
+                <Text style={[styles.detailText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                  {item.visibility / 1000} km
           </Text>
-          <Text 
-            style={[
-              styles.minTemp, 
-              { color: isDark ? Colors.dark.text : Colors.light.text, opacity: 0.7 }
-            ]}
-          >
-            {Math.round(tempMin)}°
+              </View>
+            </View>
+
+            <Text style={[styles.description, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+              {item.description}
           </Text>
         </View>
+        )}
       </View>
     );
   };
@@ -126,21 +240,12 @@ export const DailyForecast: React.FC<DailyForecastProps> = ({
           Próximos días
         </Text>
         
-        <View style={styles.daysContainer}>
-          {dailyData.map((item, index) => (
-            <View key={`day-${index}`}>
-              {renderDayItem({ item, index })}
-              {index < dailyData.length - 1 && (
-                <View 
-                  style={[
-                    styles.divider, 
-                    { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }
-                  ]} 
-                />
-              )}
-            </View>
-          ))}
-        </View>
+        <FlatList
+          data={dailyData}
+          renderItem={renderDayItem}
+          keyExtractor={(item, index) => `day-${index}`}
+          scrollEnabled={false}
+        />
       </BlurView>
     </View>
   );
@@ -152,7 +257,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 16,
     paddingHorizontal: 16,
-    marginBottom: 20,
   },
   contentContainer: {
     width: '100%',
@@ -164,44 +268,74 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 16,
-    marginLeft: 4,
-  },
-  daysContainer: {
-    width: '100%',
   },
   dayItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 4,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
   },
-  dayText: {
-    fontSize: 16,
-    fontWeight: '500',
+  expandedDayItem: {
+    borderBottomWidth: 0,
+  },
+  dayContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dayInfo: {
     flex: 1,
   },
-  todayText: {
-    fontWeight: '700',
-  },
-  tempRange: {
-    flexDirection: 'row',
-    width: 80,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-  },
-  maxTemp: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginRight: 8,
-  },
-  minTemp: {
-    fontSize: 16,
+  dayName: {
+    fontSize: 15,
     fontWeight: '500',
   },
-  divider: {
-    height: 1,
-    width: '100%',
+  date: {
+    fontSize: 13,
+    opacity: 0.7,
+  },
+  weatherInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  tempContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    minWidth: 50,
+  },
+  tempMax: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  tempMin: {
+    fontSize: 14,
+    opacity: 0.7,
+  },
+  detailsContainer: {
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  detailText: {
+    fontSize: 12,
+  },
+  description: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginTop: 8,
   },
   loadingText: {
     fontSize: 16,

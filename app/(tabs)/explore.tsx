@@ -1,18 +1,33 @@
-import React, { useContext } from 'react';
+import React from 'react';
 import { StyleSheet, View, Text, Dimensions, ScrollView, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
+import axios from 'axios';
 
 import { useLocation } from '../../hooks/useLocation';
 import { useWeather } from '../../hooks/useWeather';
 import { WeatherIcon } from '../../components/weather/WeatherIcon';
 import { useColorScheme } from '../../hooks/useColorScheme';
 import { Colors } from '../../constants/Colors';
+import { 
+  WEATHER_API_KEY, 
+  ONECALL_API_BASE_URL, 
+  AIR_POLLUTION_API_BASE_URL,
+  WeatherData,
+  AirPollutionData,
+  Alert,
+  MinuteForecastData,
+  DetailCardProps,
+  AirQualityProps,
+  UVIndexProps,
+  WeatherAlertsProps,
+  MinuteForecastProps
+} from '../../config/weather';
 
 // Componente de información detallada
-const DetailCard = ({ title, value, icon, units = '', colorScheme }) => {
+const DetailCard = ({ title, value, icon, units = '', colorScheme }: DetailCardProps) => {
   const isDark = colorScheme === 'dark';
   
   return (
@@ -22,7 +37,7 @@ const DetailCard = ({ title, value, icon, units = '', colorScheme }) => {
       style={styles.detailCard}
     >
       <View style={styles.detailHeader}>
-        <Ionicons name={icon} size={24} color={isDark ? Colors.dark.text : Colors.light.text} />
+        <Ionicons name={icon as any} size={24} color={isDark ? Colors.dark.text : Colors.light.text} />
         <Text style={[styles.detailTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
           {title}
         </Text>
@@ -35,7 +50,7 @@ const DetailCard = ({ title, value, icon, units = '', colorScheme }) => {
 };
 
 // Componente para mostrar la calidad del aire
-const AirQuality = ({ quality = 'Buena', index = 42, colorScheme }) => {
+const AirQuality = ({ quality = 'Buena', index = 42, colorScheme }: AirQualityProps) => {
   const isDark = colorScheme === 'dark';
   
   const getQualityColor = () => {
@@ -76,7 +91,7 @@ const AirQuality = ({ quality = 'Buena', index = 42, colorScheme }) => {
 };
 
 // Componente de información UV
-const UVIndex = ({ index = 5, colorScheme }) => {
+const UVIndex = ({ index = 5, colorScheme }: UVIndexProps) => {
   const isDark = colorScheme === 'dark';
   
   const getUVColor = () => {
@@ -127,14 +142,113 @@ const UVIndex = ({ index = 5, colorScheme }) => {
   );
 };
 
+// Componente para mostrar alertas meteorológicas
+const WeatherAlerts = ({ alerts = [], colorScheme }: WeatherAlertsProps) => {
+  const isDark = colorScheme === 'dark';
+  
+  if (!alerts || alerts.length === 0) return null;
+  
+  return (
+    <BlurView
+      tint={isDark ? 'dark' : 'light'}
+      intensity={80}
+      style={[styles.alertsCard, { marginTop: 16 }]}
+    >
+      <View style={styles.alertsHeader}>
+        <Ionicons name="warning-outline" size={24} color={isDark ? Colors.dark.text : Colors.light.text} />
+        <Text style={[styles.alertsTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+          Alertas Meteorológicas
+        </Text>
+      </View>
+      
+      {alerts.map((alert: Alert, index: number) => (
+        <View key={index} style={styles.alertItem}>
+          <Text style={[styles.alertEvent, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+            {alert.event}
+          </Text>
+          <Text style={[styles.alertDescription, { color: isDark ? Colors.dark.text : Colors.light.text, opacity: 0.7 }]}>
+            {alert.description}
+          </Text>
+        </View>
+      ))}
+    </BlurView>
+  );
+};
+
+// Componente para mostrar el pronóstico minuto a minuto
+const MinuteForecast = ({ data = [], colorScheme }: MinuteForecastProps) => {
+  const isDark = colorScheme === 'dark';
+  
+  if (!data || data.length === 0) return null;
+  
+  return (
+    <BlurView
+      tint={isDark ? 'dark' : 'light'}
+      intensity={80}
+      style={[styles.minuteForecastCard, { marginTop: 16 }]}
+    >
+      <View style={styles.minuteForecastHeader}>
+        <Ionicons name="time-outline" size={24} color={isDark ? Colors.dark.text : Colors.light.text} />
+        <Text style={[styles.minuteForecastTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+          Pronóstico Minuto a Minuto
+        </Text>
+      </View>
+      
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        {data.map((item: MinuteForecastData, index: number) => (
+          <View key={index} style={styles.minuteForecastItem}>
+            <Text style={[styles.minuteForecastTime, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+              {new Date(item.dt * 1000).getHours()}:00
+            </Text>
+            <Text style={[styles.minuteForecastPrecipitation, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+              {Math.round(item.precipitation * 100)}%
+            </Text>
+          </View>
+        ))}
+      </ScrollView>
+    </BlurView>
+  );
+};
+
 export default function ExploreScreen() {
-  const colorScheme = useColorScheme();
+  const colorScheme = useColorScheme() || 'light';
   const isDark = colorScheme === 'dark';
   const location = useLocation();
   const { current, forecast, isLoading, error } = useWeather(location.latitude, location.longitude);
+  const [minuteForecast, setMinuteForecast] = React.useState<MinuteForecastData[]>([]);
+  const [alerts, setAlerts] = React.useState<Alert[]>([]);
+  const [airPollution, setAirPollution] = React.useState<AirPollutionData | null>(null);
+
+  React.useEffect(() => {
+    const fetchAdditionalData = async () => {
+      try {
+        if (!location.latitude || !location.longitude) return;
+
+        // Obtener pronóstico minuto a minuto y alertas
+        const oneCallResponse = await axios.get(
+          `${ONECALL_API_BASE_URL}?lat=${location.latitude}&lon=${location.longitude}&exclude=current,minutely,hourly,daily&appid=${WEATHER_API_KEY}`
+        );
+        setMinuteForecast(oneCallResponse.data.minutely || []);
+        setAlerts(oneCallResponse.data.alerts || []);
+
+        // Obtener datos de contaminación del aire
+        const airPollutionResponse = await axios.get(
+          `${AIR_POLLUTION_API_BASE_URL}?lat=${location.latitude}&lon=${location.longitude}&appid=${WEATHER_API_KEY}`
+        );
+        setAirPollution(airPollutionResponse.data);
+      } catch (error) {
+        console.error('Error fetching additional weather data:', error);
+        setMinuteForecast([]);
+        setAlerts([]);
+        setAirPollution(null);
+      }
+    };
+
+    fetchAdditionalData();
+  }, [location]);
 
   // Determinar el color de fondo basado en el clima actual
-  const getBackgroundColors = () => {
+  const getBackgroundColors = (): [string, string] => {
     if (!current || !current.weather[0]) {
       return isDark 
         ? ['#1c1c1e', '#2c2c2e'] 
@@ -242,9 +356,15 @@ export default function ExploreScreen() {
               />
             </View>
             
-            <AirQuality colorScheme={colorScheme} />
-            <UVIndex colorScheme={colorScheme} />
-            
+            <MinuteForecast data={minuteForecast} colorScheme={colorScheme} />
+            <WeatherAlerts alerts={alerts} colorScheme={colorScheme} />
+            <AirQuality 
+              quality={airPollution?.list?.[0]?.main?.aqi ? 
+                airPollution.list[0].main.aqi.toString() : 'Buena'} 
+              index={airPollution?.list?.[0]?.main?.aqi || 42}
+              colorScheme={colorScheme}
+            />
+            <UVIndex index={current.uvi || 0} colorScheme={colorScheme} />
           </ScrollView>
         </SafeAreaView>
       </LinearGradient>
@@ -394,5 +514,61 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '500',
     color: 'white',
+  },
+  alertsCard: {
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 16,
+    overflow: 'hidden',
+  },
+  alertsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  alertsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  alertItem: {
+    marginBottom: 12,
+  },
+  alertEvent: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  alertDescription: {
+    fontSize: 14,
+  },
+  minuteForecastCard: {
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 16,
+    overflow: 'hidden',
+  },
+  minuteForecastHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  minuteForecastTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  minuteForecastItem: {
+    alignItems: 'center',
+    marginRight: 16,
+    padding: 8,
+  },
+  minuteForecastTime: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  minuteForecastPrecipitation: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

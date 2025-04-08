@@ -1,10 +1,10 @@
-import React, { useRef } from 'react';
-import { StyleSheet, Text, View, FlatList, Dimensions, ScrollView } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { StyleSheet, Text, View, FlatList, ScrollView, TouchableOpacity } from 'react-native';
 import { format, addHours } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { BlurView } from 'expo-blur';
-import { LineChart } from 'react-native-chart-kit';
-import Svg, { Path, Line, Circle, Text as SvgText } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
+import { Ionicons } from '@expo/vector-icons';
 
 import { ForecastData } from '../../types/weather';
 import { WeatherIcon } from './WeatherIcon';
@@ -22,12 +22,9 @@ export const HourlyForecast: React.FC<HourlyForecastProps> = ({
 }) => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  
-  // Mover las referencias aquí, antes de cualquier lógica condicional
-  // Referencia al ScrollView que contiene el gráfico
   const scrollViewRef = useRef<ScrollView>(null);
-  // Referencia al FlatList
   const flatListRef = useRef<FlatList>(null);
+  const [showDetails, setShowDetails] = useState(false);
 
   if (isLoading || !forecastData) {
     return (
@@ -48,23 +45,18 @@ export const HourlyForecast: React.FC<HourlyForecastProps> = ({
     );
   }
 
-  // Crear un array con pronóstico para las próximas 24 horas, con intervalo de 1 hora
   const createHourlyData = () => {
-    // Obtener los datos por horas del pronóstico original (cada 3 horas)
     const originalData = forecastData.list.slice(0, 8);
     const hourlyDataArray = [];
     
     const now = new Date();
     
-    // Crear 24 entradas para las próximas 24 horas
     for (let i = 0; i < 24; i++) {
       const targetHour = addHours(now, i);
-      // Encontrar el pronóstico de 3 horas más cercano
       const closestForecast = findClosestForecast(originalData, targetHour);
       
-      // Crear entrada para esta hora específica
       hourlyDataArray.push({
-        dt: targetHour.getTime() / 1000, // Convertir a timestamp unix
+        dt: targetHour.getTime() / 1000,
         main: {
           temp: closestForecast.main.temp,
           feels_like: closestForecast.main.feels_like,
@@ -84,7 +76,6 @@ export const HourlyForecast: React.FC<HourlyForecastProps> = ({
     return hourlyDataArray;
   };
   
-  // Función para encontrar el pronóstico más cercano a una hora determinada
   const findClosestForecast = (forecasts: typeof forecastData.list, targetDate: Date) => {
     let closestForecast = forecasts[0];
     let minDiff = Infinity;
@@ -102,17 +93,16 @@ export const HourlyForecast: React.FC<HourlyForecastProps> = ({
     return closestForecast;
   };
 
-  // Generar los datos por hora
   const hourlyData = createHourlyData();
-
-  // Preparar datos para el gráfico
-  const temperatureData = hourlyData.slice(0, 8).map(item => Math.round(item.main.temp));
-  const hours = hourlyData.slice(0, 8).map(item => format(new Date(item.dt * 1000), 'HH:00'));
-  
-  // Encontrar min y max temperatura para escalar el gráfico
-  const minTemp = Math.min(...temperatureData);
-  const maxTemp = Math.max(...temperatureData);
+  const temperatures = hourlyData.map(item => item.main.temp);
+  const minTemp = Math.min(...temperatures);
+  const maxTemp = Math.max(...temperatures);
   const tempRange = maxTemp - minTemp;
+
+  const getTemperatureHeight = (temp: number) => {
+    if (tempRange === 0) return 0.5;
+    return (temp - minTemp) / tempRange;
+  };
 
   const renderHourItem = ({ item, index }: { item: any, index: number }) => {
     const date = new Date(item.dt * 1000);
@@ -120,15 +110,11 @@ export const HourlyForecast: React.FC<HourlyForecastProps> = ({
     const isNow = format(new Date(), 'HH:00') === hour;
     const temp = Math.round(item.main.temp);
     const iconCode = item.weather[0].icon;
+    const pop = item.pop ? Math.round(item.pop * 100) : 0;
+    const windSpeed = item.wind?.speed ? Math.round(item.wind.speed * 3.6) : 0;
 
     return (
-      <View style={[
-        styles.hourItem,
-        isNow && { 
-          backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-          borderRadius: 12 
-        }
-      ]}>
+      <View style={styles.hourItem}>
         <Text style={[
           styles.hourText, 
           { color: isDark ? Colors.dark.text : Colors.light.text },
@@ -146,108 +132,92 @@ export const HourlyForecast: React.FC<HourlyForecastProps> = ({
         ]}>
           {temp}°
         </Text>
+
+        <View style={styles.detailsContainer}>
+          {pop > 0 && (
+            <View style={styles.detailItem}>
+              <Ionicons 
+                name="water-outline" 
+                size={12} 
+                color={isDark ? Colors.dark.text : Colors.light.text} 
+              />
+              <Text style={[
+                styles.detailText, 
+                { color: isDark ? Colors.dark.text : Colors.light.text }
+              ]}>
+                {pop}%
+              </Text>
+            </View>
+          )}
+          
+          {windSpeed > 0 && (
+            <View style={styles.detailItem}>
+              <Ionicons 
+                name="wind-outline" 
+                size={12} 
+                color={isDark ? Colors.dark.text : Colors.light.text} 
+              />
+              <Text style={[
+                styles.detailText, 
+                { color: isDark ? Colors.dark.text : Colors.light.text }
+              ]}>
+                {windSpeed}
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
     );
   };
-  
-  // Para el gráfico personalizado
+
   const createTempGraph = () => {
-    const visibleData = temperatureData.slice(0, 8);
-    if (visibleData.length < 2) return null;
+    if (hourlyData.length < 2) return null;
     
-    // Calcular altura del gráfico y posición de los puntos
     const graphHeight = 45;
     const cardWidth = 70;
     const cardMargin = 16;
     const totalCardWidth = cardWidth + cardMargin;
+    const totalWidth = (cardWidth + cardMargin) * hourlyData.length;
     
-    // Espacio total necesario para el gráfico - ajustado para cubrir todo el ancho
-    const totalWidth = (cardWidth + cardMargin) * visibleData.length;
+    const temperatures = hourlyData.map(item => item.main.temp);
+    const minTemp = Math.min(...temperatures);
+    const maxTemp = Math.max(...temperatures);
+    const tempRange = maxTemp - minTemp;
     
-    // Ajustar el rango para temperaturas
-    let adjustedMinTemp = minTemp;
-    let adjustedMaxTemp = maxTemp;
-    
-    if (maxTemp - minTemp < 4) {
-      adjustedMinTemp = minTemp - 2;
-      adjustedMaxTemp = maxTemp + 2;
-    }
-    
-    const adjustedRange = adjustedMaxTemp - adjustedMinTemp;
-    
-    // Crear puntos normalizados para el path
-    let points = [];
-    
-    for (let i = 0; i < visibleData.length; i++) {
-      const normalizedValue = adjustedRange > 0 
-        ? 1 - ((visibleData[i] - adjustedMinTemp) / adjustedRange) 
+    // Crear puntos para el gráfico
+    const points = hourlyData.map((item, index) => {
+      const temp = item.main.temp;
+      const normalizedValue = tempRange > 0 
+        ? 1 - ((temp - minTemp) / tempRange) 
         : 0.5;
       
-      const constrainedValue = Math.min(0.9, Math.max(0.1, normalizedValue));
+      const x = (cardWidth / 2) + (index * totalCardWidth);
+      const y = 5 + (normalizedValue * graphHeight);
       
-      const x = (cardWidth / 2) + (i * totalCardWidth);
-      const y = 5 + (constrainedValue * graphHeight);
-      
-      points.push({ x, y });
-    }
+      return { x, y };
+    });
     
-    // Crear path para la línea
-    let path = `M ${points[0].x} ${points[0].y}`;
-    for (let i = 1; i < points.length; i++) {
-      path += ` L ${points[i].x} ${points[i].y}`;
-    }
+    // Crear el path para la línea
+    const path = points.reduce((acc, point, index) => {
+      if (index === 0) return `M ${point.x} ${point.y}`;
+      return `${acc} L ${point.x} ${point.y}`;
+    }, '');
     
     return (
-      <View style={{ paddingLeft: 12, paddingRight: 12 }}>
+      <View style={styles.graphWrapper}>
         <Svg height={graphHeight + 20} width={totalWidth}>
-          {/* Líneas de referencia horizontales (muy sutiles) */}
-          <Line
-            x1="0"
-            y1={5}
-            x2={totalWidth}
-            y2={5}
-            stroke={isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)"}
-            strokeWidth={1}
-            strokeDasharray="3,3"
-          />
-          <Line
-            x1="0"
-            y1={5 + graphHeight / 2}
-            x2={totalWidth}
-            y2={5 + graphHeight / 2}
-            stroke={isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)"}
-            strokeWidth={1}
-            strokeDasharray="3,3"
-          />
-          <Line
-            x1="0"
-            y1={5 + graphHeight}
-            x2={totalWidth}
-            y2={5 + graphHeight}
-            stroke={isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)"}
-            strokeWidth={1}
-            strokeDasharray="3,3"
-          />
-          
-          {/* Área bajo la curva con gradiente sutil */}
-          <Path
-            d={`${path} L ${points[points.length-1].x} ${5 + graphHeight} L ${points[0].x} ${5 + graphHeight} Z`}
-            fill={isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.01)"}
-          />
-          
-          {/* Línea de tendencia */}
           <Path
             d={path}
             stroke={isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.2)"}
             strokeWidth={1.5}
             fill="transparent"
+            strokeLinecap="round"
           />
         </Svg>
       </View>
     );
   };
 
-  // Manejador de desplazamiento para sincronizar el ScrollView con el FlatList
   const handleScroll = (event: any) => {
     if (scrollViewRef.current) {
       const offsetX = event.nativeEvent.contentOffset.x;
@@ -280,14 +250,13 @@ export const HourlyForecast: React.FC<HourlyForecastProps> = ({
             scrollEventThrottle={16}
           />
           
-          {/* ScrollView para el gráfico que se desplaza junto con el FlatList */}
           <ScrollView 
             ref={scrollViewRef}
             horizontal 
             showsHorizontalScrollIndicator={false}
             scrollEnabled={false}
             style={styles.graphScrollContainer}
-            contentContainerStyle={{ height: 65 }}
+            contentContainerStyle={styles.graphContentContainer}
           >
             {createTempGraph()}
           </ScrollView>
@@ -296,8 +265,6 @@ export const HourlyForecast: React.FC<HourlyForecastProps> = ({
     </View>
   );
 };
-
-const { width } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
   container: {
@@ -323,6 +290,9 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: '100%',
   },
+  graphWrapper: {
+    paddingHorizontal: 0,
+  },
   graphScrollContainer: {
     position: 'absolute',
     top: 75,
@@ -330,10 +300,13 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 1,
     height: 65,
-    width: '100%',
+  },
+  graphContentContainer: {
+    height: 65,
   },
   listContent: {
-    paddingRight: 8,
+    paddingRight: 0,
+    paddingLeft: 0,
   },
   hourItem: {
     alignItems: 'center',
@@ -361,5 +334,20 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginVertical: 20,
     textAlign: 'center',
+  },
+  detailsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 8,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  detailText: {
+    fontSize: 10,
+    marginLeft: 2,
   },
 }); 

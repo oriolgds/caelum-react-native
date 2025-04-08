@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, Text, View, Dimensions } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, Text, View, Dimensions, TouchableOpacity } from 'react-native';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +21,7 @@ export const CurrentWeather: React.FC<CurrentWeatherProps> = ({
 }) => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const [showDetails, setShowDetails] = useState(false);
   
   if (isLoading || !weatherData) {
     return (
@@ -56,12 +57,14 @@ export const CurrentWeather: React.FC<CurrentWeatherProps> = ({
         style={styles.contentContainer}
       >
         <View style={styles.header}>
-          <Text style={[styles.cityName, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-            {cityName}
-          </Text>
-          <Text style={[styles.date, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-            {formattedDate}
-          </Text>
+          <View>
+            <Text style={[styles.cityName, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+              {cityName}
+            </Text>
+            <Text style={[styles.date, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+              {formattedDate}
+            </Text>
+          </View>
         </View>
         
         <View style={styles.mainInfo}>
@@ -72,60 +75,123 @@ export const CurrentWeather: React.FC<CurrentWeatherProps> = ({
               {temp}°
             </Text>
             <Text style={[styles.description, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-              {description.charAt(0).toUpperCase() + description.slice(1)}
-            </Text>
-            <Text style={[styles.feelsLike, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-              Sensación térmica: {feelsLike}°
+              {description}
             </Text>
           </View>
-        </View>
-        
-        <View style={styles.minMaxContainer}>
-          <Text style={[styles.minMax, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-            Mín: {tempMin}° / Máx: {tempMax}°
-          </Text>
         </View>
         
         <View style={styles.detailsContainer}>
-          <View style={styles.detailItem}>
-            <Ionicons name="water-outline" size={22} color={isDark ? Colors.dark.text : Colors.light.text} />
-            <Text style={[styles.detailText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-              {humidity}%
-            </Text>
-            <Text style={[styles.detailLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-              Humedad
-            </Text>
+          <View style={styles.detailRow}>
+            <View style={styles.detailItem}>
+              <Ionicons 
+                name="thermometer-outline" 
+                size={20} 
+                color={isDark ? Colors.dark.text : Colors.light.text} 
+              />
+              <Text style={[styles.detailText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                Sensación: {feelsLike}°
+              </Text>
+            </View>
+            <View style={styles.detailItem}>
+              <Ionicons 
+                name="water-outline" 
+                size={20} 
+                color={isDark ? Colors.dark.text : Colors.light.text} 
+              />
+              <Text style={[styles.detailText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                Humedad: {humidity}%
+              </Text>
+            </View>
           </View>
           
-          <View style={styles.detailItem}>
-            <Ionicons name="speedometer-outline" size={22} color={isDark ? Colors.dark.text : Colors.light.text} />
-            <Text style={[styles.detailText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-              {windSpeed} km/h
-            </Text>
-            <Text style={[styles.detailLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-              Viento
-            </Text>
+          <View style={styles.detailRow}>
+            <View style={styles.detailItem}>
+              <Ionicons 
+                name="wind-outline" 
+                size={20} 
+                color={isDark ? Colors.dark.text : Colors.light.text} 
+              />
+              <Text style={[styles.detailText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                Viento: {windSpeed} km/h
+              </Text>
+            </View>
+            <View style={styles.detailItem}>
+              <Ionicons 
+                name="sunny-outline" 
+                size={20} 
+                color={isDark ? Colors.dark.text : Colors.light.text} 
+              />
+              <Text style={[styles.detailText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                Amanecer: {formattedSunrise}
+              </Text>
+            </View>
           </View>
-          
-          <View style={styles.detailItem}>
-            <Ionicons name="sunny-outline" size={22} color={isDark ? Colors.dark.text : Colors.light.text} />
-            <Text style={[styles.detailText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-              {formattedSunrise}
+
+          {showDetails && (
+            <>
+              <View style={styles.detailRow}>
+                <View style={styles.detailItem}>
+                  <Ionicons 
+                    name="speedometer-outline" 
+                    size={20} 
+                    color={isDark ? Colors.dark.text : Colors.light.text} 
+                  />
+                  <Text style={[styles.detailText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                    Presión: {weatherData.main.pressure} hPa
+                  </Text>
+                </View>
+                <View style={styles.detailItem}>
+                  <Ionicons 
+                    name="eye-outline" 
+                    size={20} 
+                    color={isDark ? Colors.dark.text : Colors.light.text} 
+                  />
+                  <Text style={[styles.detailText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                    Visibilidad: {weatherData.visibility / 1000} km
+                  </Text>
+                </View>
+              </View>
+              
+              {weatherData.wind.gust && (
+                <View style={styles.detailRow}>
+                  <View style={styles.detailItem}>
+                    <Ionicons 
+                      name="wind" 
+                      size={20} 
+                      color={isDark ? Colors.dark.text : Colors.light.text} 
+                    />
+                    <Text style={[styles.detailText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                      Ráfagas: {Math.round(weatherData.wind.gust * 3.6)} km/h
+                    </Text>
+                  </View>
+                  <View style={styles.detailItem}>
+                    <Ionicons 
+                      name="moon-outline" 
+                      size={20} 
+                      color={isDark ? Colors.dark.text : Colors.light.text} 
+                    />
+                    <Text style={[styles.detailText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+                      Atardecer: {formattedSunset}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </>
+          )}
+
+          <TouchableOpacity 
+            style={styles.moreInfoButton}
+            onPress={() => setShowDetails(!showDetails)}
+          >
+            <Text style={[styles.moreInfoText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+              {showDetails ? 'Menos información' : 'Más información'}
             </Text>
-            <Text style={[styles.detailLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-              Amanecer
-            </Text>
-          </View>
-          
-          <View style={styles.detailItem}>
-            <Ionicons name="moon-outline" size={22} color={isDark ? Colors.dark.text : Colors.light.text} />
-            <Text style={[styles.detailText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-              {formattedSunset}
-            </Text>
-            <Text style={[styles.detailLabel, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-              Atardecer
-            </Text>
-          </View>
+            <Ionicons 
+              name={showDetails ? 'chevron-up' : 'chevron-down'} 
+              size={20} 
+              color={isDark ? Colors.dark.text : Colors.light.text} 
+            />
+          </TouchableOpacity>
         </View>
       </BlurView>
     </View>
@@ -138,81 +204,79 @@ const styles = StyleSheet.create({
   container: {
     width: '100%',
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 16,
     paddingHorizontal: 16,
   },
   contentContainer: {
     width: '100%',
     borderRadius: 24,
-    padding: 20,
+    padding: 16,
     overflow: 'hidden',
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   cityName: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '700',
-    marginBottom: 4,
   },
   date: {
     fontSize: 16,
-    fontWeight: '500',
     opacity: 0.8,
   },
   mainInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     marginBottom: 24,
   },
   tempContainer: {
-    alignItems: 'flex-end',
+    marginLeft: 16,
+    alignItems: 'center',
   },
   temp: {
-    fontSize: 64,
-    fontWeight: '300',
+    fontSize: 48,
+    fontWeight: '700',
   },
   description: {
     fontSize: 18,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  feelsLike: {
-    fontSize: 14,
-    fontWeight: '400',
-    opacity: 0.7,
-  },
-  minMaxContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  minMax: {
-    fontSize: 16,
-    fontWeight: '500',
+    textTransform: 'capitalize',
   },
   detailsContainer: {
+    width: '100%',
+  },
+  detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 16,
+    marginBottom: 12,
   },
   detailItem: {
+    flexDirection: 'row',
     alignItems: 'center',
-    width: (width - 80) / 4,
+    flex: 1,
   },
   detailText: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginTop: 4,
-  },
-  detailLabel: {
-    fontSize: 12,
-    opacity: 0.7,
-    marginTop: 2,
+    marginLeft: 8,
+    fontSize: 14,
   },
   loadingText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '500',
+    marginVertical: 20,
+    textAlign: 'center',
+  },
+  moreInfoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    paddingVertical: 8,
+  },
+  moreInfoText: {
+    fontSize: 14,
+    marginRight: 4,
   },
 }); 
