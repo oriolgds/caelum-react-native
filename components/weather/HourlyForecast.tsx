@@ -156,20 +156,18 @@ export const HourlyForecast: React.FC<HourlyForecastProps> = ({
     if (visibleData.length < 2) return null;
     
     // Calcular altura del gráfico y posición de los puntos
-    const graphHeight = 45; // Ajustar para mayor compacidad
-    const cardWidth = 70; // Ancho aproximado de cada tarjeta de hora
-    const cardMargin = 16; // Margen entre tarjetas
+    const graphHeight = 45;
+    const cardWidth = 70;
+    const cardMargin = 16;
     const totalCardWidth = cardWidth + cardMargin;
     
-    // Espacio total necesario para el gráfico (igual que el contenedor de la lista)
-    const totalWidth = (cardWidth + cardMargin) * visibleData.length + 16;
+    // Espacio total necesario para el gráfico - ajustado para cubrir todo el ancho
+    const totalWidth = (cardWidth + cardMargin) * visibleData.length;
     
-    // Ajustar el rango para temperaturas bajas
-    // Garantizar un rango mínimo para que se visualice correctamente
+    // Ajustar el rango para temperaturas
     let adjustedMinTemp = minTemp;
     let adjustedMaxTemp = maxTemp;
     
-    // Si el rango es muy pequeño o nulo, crear un rango artificial
     if (maxTemp - minTemp < 4) {
       adjustedMinTemp = minTemp - 2;
       adjustedMaxTemp = maxTemp + 2;
@@ -181,21 +179,16 @@ export const HourlyForecast: React.FC<HourlyForecastProps> = ({
     let points = [];
     
     for (let i = 0; i < visibleData.length; i++) {
-      // Normalizar temperatura entre 0-1 (invertido para que mayor temperatura = más arriba)
-      // Usar el rango ajustado para mejor visualización
       const normalizedValue = adjustedRange > 0 
         ? 1 - ((visibleData[i] - adjustedMinTemp) / adjustedRange) 
         : 0.5;
       
-      // Limitar el valor normalizado entre 0.1 y 0.9 para que siempre se vea dentro del gráfico
       const constrainedValue = Math.min(0.9, Math.max(0.1, normalizedValue));
       
-      // Posicionar en el centro de cada tarjeta
       const x = (cardWidth / 2) + (i * totalCardWidth);
-      // Usar valor restringido para calcular la posición Y
       const y = 5 + (constrainedValue * graphHeight);
       
-      points.push({ x, y, temp: visibleData[i] });
+      points.push({ x, y });
     }
     
     // Crear path para la línea
@@ -205,7 +198,7 @@ export const HourlyForecast: React.FC<HourlyForecastProps> = ({
     }
     
     return (
-      <View style={{ paddingLeft: 12, paddingRight: 4 }}>
+      <View style={{ paddingLeft: 12, paddingRight: 12 }}>
         <Svg height={graphHeight + 20} width={totalWidth}>
           {/* Líneas de referencia horizontales (muy sutiles) */}
           <Line
@@ -239,7 +232,7 @@ export const HourlyForecast: React.FC<HourlyForecastProps> = ({
           {/* Área bajo la curva con gradiente sutil */}
           <Path
             d={`${path} L ${points[points.length-1].x} ${5 + graphHeight} L ${points[0].x} ${5 + graphHeight} Z`}
-            fill={isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.02)"}
+            fill={isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.01)"}
           />
           
           {/* Línea de tendencia */}
@@ -249,48 +242,6 @@ export const HourlyForecast: React.FC<HourlyForecastProps> = ({
             strokeWidth={1.5}
             fill="transparent"
           />
-          
-          {/* Puntos y líneas verticales para cada temperatura */}
-          {points.map((point, index) => (
-            <React.Fragment key={`point-${index}`}>
-              {/* Línea vertical hasta el eje x (muy sutil) */}
-              <Line
-                x1={point.x}
-                y1={point.y}
-                x2={point.x}
-                y2={5 + graphHeight}
-                stroke={isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.03)"}
-                strokeWidth={1}
-                strokeDasharray="2,2"
-              />
-              
-              {/* Punto para cada temperatura */}
-              <Circle
-                cx={point.x}
-                cy={point.y}
-                r={9}
-                fill={isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)"}
-              />
-              <Circle
-                cx={point.x}
-                cy={point.y}
-                r={3}
-                fill={isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.2)"}
-              />
-              
-              {/* Temperatura dentro del punto */}
-              <SvgText
-                x={point.x}
-                y={point.y + 3}
-                fontSize="9"
-                fontWeight="500"
-                textAnchor="middle"
-                fill={isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.6)"}
-              >
-                {point.temp}°
-              </SvgText>
-            </React.Fragment>
-          ))}
         </Svg>
       </View>
     );
@@ -374,11 +325,12 @@ const styles = StyleSheet.create({
   },
   graphScrollContainer: {
     position: 'absolute',
-    top: 75, // Ajustar aún más arriba
+    top: 75,
     left: 0,
     right: 0,
     zIndex: 1,
-    height: 65, // Altura ligeramente menor para ajustar al gráfico más compacto
+    height: 65,
+    width: '100%',
   },
   listContent: {
     paddingRight: 8,
