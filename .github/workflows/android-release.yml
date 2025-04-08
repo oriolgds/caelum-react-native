@@ -2,12 +2,23 @@ name: Android Release Build
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
+    paths:
+      - "android/**"
+      - "app.json"
+      - "package.json"
+      - "babel.config.js"
+      - "metro.config.js"
+  pull_request:
+    branches: [main, master]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
 
     steps:
       - uses: actions/checkout@v3
