@@ -36,6 +36,13 @@ jobs:
           cd android
           ./gradlew assembleRelease
 
+      - name: Ensure APK exists
+        run: |
+          if [ ! -f android/app/build/outputs/apk/release/app-release.apk ]; then
+            echo "APK not found!"
+            exit 1
+          fi
+
       - name: Upload APK
         uses: actions/upload-artifact@v3
         with:
