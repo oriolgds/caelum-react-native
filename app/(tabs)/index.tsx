@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { StyleSheet, View, ScrollView, RefreshControl, Text, Image, StatusBar, Dimensions, Animated, Platform } from 'react-native';
+import { StyleSheet, View, ScrollView, RefreshControl, Text, StatusBar, Dimensions, Animated, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -26,131 +26,50 @@ export default function HomeScreen() {
     refreshWeather 
   } = useWeather(location.latitude, location.longitude);
 
-  // Ref para el scrollView
+  // Solo mantenemos el scrollY para las animaciones de la barra de búsqueda
   const scrollY = useRef(new Animated.Value(0)).current;
 
-  // Animaciones
-  const headerHeight = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [Platform.OS === 'ios' ? 60 : 20, 10],
-    extrapolate: 'clamp'
-  });
+  // Valores para controlar la animación de la barra de búsqueda
+  const searchBarHeight = 70;
+  const lastScrollY = useRef(0);
+  const scrollDirection = useRef(new Animated.Value(0)).current;
+  const isScrollingDown = useRef(false);
+  const searchBarTranslateY = useRef(new Animated.Value(0)).current;
+  const velocityThreshold = 0.5;
+  const distanceThreshold = 10;
 
-  const headerFontSize = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [28, 20],
-    extrapolate: 'clamp'
-  });
-
-  const headerTranslateX = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [0, 15],
-    extrapolate: 'clamp'
-  });
-
-  // Animaciones muy impactantes para SearchBar
-  const searchBarTranslateY = scrollY.interpolate({
-    inputRange: [0, 80, 100],
-    outputRange: [0, -70, -64],
-    extrapolate: 'clamp'
-  });
-
-  const searchBarTranslateX = scrollY.interpolate({
-    inputRange: [0, 50, 80, 100],
-    outputRange: [0, 40, -5, 0],
-    extrapolate: 'clamp'
-  });
-
-  // Usamos valores absolutos en lugar de porcentajes para el ancho
-  const searchBarWidth = scrollY.interpolate({
-    inputRange: [0, 50, 100],
-    outputRange: [Dimensions.get('window').width * 0.92, Dimensions.get('window').width * 0.6, 50],
-    extrapolate: 'clamp'
-  });
-
-  const searchBarHeight = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [48, 50],
-    extrapolate: 'clamp'
-  });
-
-  const searchBarBorderRadius = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [16, 25],
-    extrapolate: 'clamp'
-  });
-
-  const searchBarRightPosition = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [16, 10],
-    extrapolate: 'clamp'
-  });
-
-  const searchBarRotation = scrollY.interpolate({
-    inputRange: [0, 50, 80, 100],
-    outputRange: ['0deg', '5deg', '-5deg', '0deg'],
-    extrapolate: 'clamp'
-  });
-
-  const searchBarScale = scrollY.interpolate({
-    inputRange: [0, 50, 80, 100],
-    outputRange: [1, 0.9, 1.1, 1],
-    extrapolate: 'clamp'
-  });
-
-  const blurIntensity = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [80, 100],
-    extrapolate: 'clamp'
-  });
-
-  const backgroundColorAnim = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: ['rgba(0,0,0,0)', 'rgba(30,30,30,0.7)'],
-    extrapolate: 'clamp'
-  });
-
-  const borderColor = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: ['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.7)'],
-    extrapolate: 'clamp'
-  });
-
-  const searchIconSize = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [20, 22],
-    extrapolate: 'clamp'
-  });
-
-  const inputFontSize = scrollY.interpolate({
-    inputRange: [0, 70, 100],
-    outputRange: [16, 10, 0],
-    extrapolate: 'clamp'
-  });
-
-  const inputOpacity = scrollY.interpolate({
-    inputRange: [0, 70, 100],
-    outputRange: [1, 0.5, 0],
-    extrapolate: 'clamp'
-  });
-
-  const searchBarOpacity = scrollY.interpolate({
-    inputRange: [0, 15, 100],
-    outputRange: [1, 0.8, 1],
-    extrapolate: 'clamp'
-  });
-
-  const searchBarMarginTop = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [Platform.OS === 'ios' ? 20 : 15, 15],
-    extrapolate: 'clamp'
-  });
-
-  const searchBarMarginBottom = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [10, 5],
-    extrapolate: 'clamp'
-  });
+  const handleScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+    { 
+      useNativeDriver: true,
+      listener: (event: any) => {
+        const currentScrollY = event.nativeEvent.contentOffset.y;
+        const velocity = (currentScrollY - lastScrollY.current) / 16; // 16ms es aproximadamente un frame
+        const distance = Math.abs(currentScrollY - lastScrollY.current);
+        
+        if (distance > distanceThreshold) {
+          const isMovingDown = currentScrollY > lastScrollY.current;
+          
+          // Solo cambiamos la dirección si la velocidad supera el umbral
+          if (Math.abs(velocity) > velocityThreshold && isMovingDown !== isScrollingDown.current) {
+            isScrollingDown.current = isMovingDown;
+            
+            // Animar la barra de búsqueda
+            Animated.spring(searchBarTranslateY, {
+              toValue: isMovingDown ? -searchBarHeight - 20 : 0,
+              useNativeDriver: true,
+              damping: 20,
+              mass: 0.8,
+              stiffness: 120,
+              overshootClamping: true
+            }).start();
+          }
+        }
+        
+        lastScrollY.current = currentScrollY;
+      }
+    }
+  );
 
   // Determinar el color de fondo basado en el clima actual
   const getBackgroundColors = () => {
@@ -214,73 +133,30 @@ export default function HomeScreen() {
         end={{ x: 0, y: 1 }}
       >
         <SafeAreaView style={styles.safeArea}>
-          <View style={styles.headerContainer}>
-            <Animated.View style={[styles.header, { marginTop: headerHeight }]}>
-              <Animated.Text 
-                style={[
-                  styles.headerTitle, 
-                  { 
-                    fontSize: headerFontSize,
-                    transform: [{ translateX: headerTranslateX }] 
-                  }
-                ]}
-              >
-                Caelum
-              </Animated.Text>
-            </Animated.View>
-            
-            <Animated.View style={{
-              position: 'absolute',
-              right: searchBarRightPosition,
-              width: searchBarWidth,
-              transform: [
-                { translateY: searchBarTranslateY },
-                { translateX: searchBarTranslateX },
-                { scale: searchBarScale },
-                { rotate: searchBarRotation }
-              ],
-              opacity: searchBarOpacity,
-              marginTop: searchBarMarginTop,
-              marginBottom: searchBarMarginBottom,
-              zIndex: 10,
-              borderWidth: 1,
-              borderColor: borderColor,
-              borderRadius: searchBarBorderRadius,
-              height: searchBarHeight,
-              backgroundColor: backgroundColorAnim,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.3,
-              shadowRadius: 4,
-              elevation: 5,
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}>
-              <SearchBar 
-                onSearch={searchByCity} 
-                isLoading={isLoading}
-                style={{
-                  borderRadius: searchBarBorderRadius,
-                  height: '100%',
-                  width: '100%',
-                }}
-                blurIntensity={blurIntensity}
-                iconSize={searchIconSize}
-                inputFontSize={inputFontSize}
-                inputOpacity={inputOpacity}
-              />
-            </Animated.View>
-          </View>
+          <Animated.View style={[
+            styles.searchBarContainer,
+            {
+              transform: [{ translateY: searchBarTranslateY }],
+              opacity: scrollY.interpolate({
+                inputRange: [0, 50],
+                outputRange: [1, 0.95],
+                extrapolate: 'clamp'
+              })
+            }
+          ]}>
+            <SearchBar 
+              onSearch={searchByCity} 
+              isLoading={isLoading}
+            />
+          </Animated.View>
 
           <Animated.ScrollView
             style={styles.scrollView}
             contentContainerStyle={styles.contentContainer}
             showsVerticalScrollIndicator={false}
-            onScroll={Animated.event(
-              [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-              { useNativeDriver: false }
-            )}
+            onScroll={handleScroll}
             scrollEventThrottle={16}
+            bounces={false}
             refreshControl={
               <RefreshControl
                 refreshing={isLoading}
@@ -316,27 +192,19 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  headerContainer: {
-    position: 'relative',
-    width: '100%',
-    zIndex: 10,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 10,
-    width: '100%',
-  },
-  headerTitle: {
-    fontWeight: '700',
-    color: 'white',
-    letterSpacing: 1,
+  searchBarContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 20,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+    height: 70,
   },
   scrollView: {
     flex: 1,
   },
   contentContainer: {
+    paddingTop: 90, // Reducido de 120
     paddingBottom: 30,
   },
   errorContainer: {

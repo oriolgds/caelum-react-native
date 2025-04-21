@@ -5,6 +5,7 @@ import { es } from 'date-fns/locale';
 import { BlurView } from 'expo-blur';
 import Svg, { Path } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { withSpring } from 'react-native-reanimated';
 
 import { ForecastData } from '../../types/weather';
 import { WeatherIcon } from './WeatherIcon';
@@ -114,10 +115,33 @@ export const HourlyForecast: React.FC<HourlyForecastProps> = ({
     const windSpeed = item.wind?.speed ? Math.round(item.wind.speed * 3.6) : 0;
 
     return (
-      <View style={styles.hourItem}>
+      <Animated.View 
+        style={[
+          styles.hourItem,
+          {
+            backgroundColor: isNow 
+              ? isDark 
+                ? 'rgba(255,255,255,0.1)' 
+                : 'rgba(0,0,0,0.05)'
+              : 'transparent',
+            borderRadius: 16,
+            transform: [
+              { 
+                scale: withSpring(isNow ? 1.05 : 1, {
+                  mass: 1,
+                  damping: 15
+                })
+              }
+            ]
+          }
+        ]}
+      >
         <Text style={[
           styles.hourText, 
-          { color: isDark ? Colors.dark.text : Colors.light.text },
+          { 
+            color: isDark ? Colors.dark.text : Colors.light.text,
+            opacity: isNow ? 1 : 0.8
+          },
           isNow && styles.currentHour
         ]}>
           {isNow ? 'Ahora' : hour}
@@ -127,7 +151,10 @@ export const HourlyForecast: React.FC<HourlyForecastProps> = ({
         
         <Text style={[
           styles.tempText, 
-          { color: isDark ? Colors.dark.text : Colors.light.text },
+          { 
+            color: isDark ? Colors.dark.text : Colors.light.text,
+            opacity: isNow ? 1 : 0.8
+          },
           isNow && styles.currentHour
         ]}>
           {temp}°
@@ -135,7 +162,11 @@ export const HourlyForecast: React.FC<HourlyForecastProps> = ({
 
         <View style={styles.detailsContainer}>
           {pop > 0 && (
-            <View style={styles.detailItem}>
+            <BlurView
+              tint={isDark ? 'dark' : 'light'}
+              intensity={isDark ? 40 : 60}
+              style={styles.detailPill}
+            >
               <Ionicons 
                 name="water-outline" 
                 size={12} 
@@ -147,11 +178,15 @@ export const HourlyForecast: React.FC<HourlyForecastProps> = ({
               ]}>
                 {pop}%
               </Text>
-            </View>
+            </BlurView>
           )}
           
           {windSpeed > 0 && (
-            <View style={styles.detailItem}>
+            <BlurView
+              tint={isDark ? 'dark' : 'light'}
+              intensity={isDark ? 40 : 60}
+              style={styles.detailPill}
+            >
               <Ionicons 
                 name="wind-outline" 
                 size={12} 
@@ -163,10 +198,10 @@ export const HourlyForecast: React.FC<HourlyForecastProps> = ({
               ]}>
                 {windSpeed}
               </Text>
-            </View>
+            </BlurView>
           )}
         </View>
-      </View>
+      </Animated.View>
     );
   };
 
@@ -229,11 +264,20 @@ export const HourlyForecast: React.FC<HourlyForecastProps> = ({
     <View style={styles.container}>
       <BlurView
         tint={isDark ? 'dark' : 'light'}
-        intensity={80}
-        style={styles.contentContainer}
+        intensity={isDark ? 60 : 80}
+        style={[
+          styles.contentContainer,
+          { borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }
+        ]}
       >
-        <Text style={[styles.title, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-          Por horas
+        <Text style={[
+          styles.title, 
+          { 
+            color: isDark ? Colors.dark.text : Colors.light.text,
+            opacity: 0.9
+          }
+        ]}>
+          Próximas horas
         </Text>
         
         <View style={styles.graphContainer}>
@@ -248,6 +292,9 @@ export const HourlyForecast: React.FC<HourlyForecastProps> = ({
             initialNumToRender={8}
             onScroll={handleScroll}
             scrollEventThrottle={16}
+            decelerationRate="fast"
+            snapToInterval={86}
+            snapToAlignment="center"
           />
           
           <ScrollView 
@@ -277,7 +324,6 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 24,
     padding: 16,
-    paddingBottom: 20,
     overflow: 'hidden',
   },
   title: {
@@ -305,14 +351,14 @@ const styles = StyleSheet.create({
     height: 65,
   },
   listContent: {
-    paddingRight: 0,
-    paddingLeft: 0,
+    paddingRight: 16,
+    paddingLeft: 16,
   },
   hourItem: {
     alignItems: 'center',
     marginRight: 16,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 12,
     minWidth: 70,
     zIndex: 2,
   },
@@ -325,9 +371,29 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   tempText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     marginTop: 8,
+  },
+  detailsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 6,
+  },
+  detailPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  detailText: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginLeft: 3,
   },
   loadingText: {
     fontSize: 16,
@@ -335,19 +401,4 @@ const styles = StyleSheet.create({
     marginVertical: 20,
     textAlign: 'center',
   },
-  detailsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 4,
-    gap: 8,
-  },
-  detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  detailText: {
-    fontSize: 10,
-    marginLeft: 2,
-  },
-}); 
+});
