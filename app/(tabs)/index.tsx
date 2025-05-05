@@ -1,223 +1,213 @@
-import React, { useRef } from 'react';
-import { StyleSheet, View, ScrollView, RefreshControl, Text, StatusBar, Dimensions, Animated, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { useRef, useEffect, useState } from "react";
+import {
+  StyleSheet,
+  View,
+  ScrollView,
+  RefreshControl,
+  StatusBar,
+  Dimensions,
+  Platform,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  useAnimatedScrollHandler,
+  interpolate,
+  Extrapolate,
+} from "react-native-reanimated";
 
-import { useLocation } from '../../hooks/useLocation';
-import { useWeather } from '../../hooks/useWeather';
-import { SearchBar } from '../../components/weather/SearchBar';
-import { CurrentWeather } from '../../components/weather/CurrentWeather';
-import { HourlyForecast } from '../../components/weather/HourlyForecast';
-import { DailyForecast } from '../../components/weather/DailyForecast';
-import { weatherConditions } from '../../constants/Weather';
-import { useColorScheme } from '../../hooks/useColorScheme';
-import { Colors } from '../../constants/Colors';
+import { useLocation } from "../../hooks/useLocation";
+import { useWeather } from "../../hooks/useWeather";
+import { SearchBar } from "../../components/weather/SearchBar";
+import { CurrentWeather } from "../../components/weather/CurrentWeather";
+import { HourlyForecast } from "../../components/weather/HourlyForecast";
+import { DailyForecast } from "../../components/weather/DailyForecast";
+import { WeatherStats } from "../../components/weather/WeatherStats";
+import { LocationManager } from "../../components/weather/LocationManager";
+import { AnimatedWeatherBackground } from "../../components/weather/AnimatedWeatherBackground";
+import { useColorScheme } from "../../hooks/useColorScheme";
 
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const isDark = colorScheme === "dark";
   const location = useLocation();
-  const { 
-    current, 
-    forecast, 
-    isLoading, 
-    error, 
-    searchByCity, 
-    refreshWeather 
-  } = useWeather(location.latitude, location.longitude);
+  const [currentCoords, setCurrentCoords] = useState<{
+    latitude: number | null;
+    longitude: number | null;
+  }>({
+    latitude: location.latitude,
+    longitude: location.longitude,
+  });
 
-  // Solo mantenemos el scrollY para las animaciones de la barra de búsqueda
-  const scrollY = useRef(new Animated.Value(0)).current;
-
-  // Valores para controlar la animación de la barra de búsqueda
-  const searchBarHeight = 70;
-  const lastScrollY = useRef(0);
-  const scrollDirection = useRef(new Animated.Value(0)).current;
-  const isScrollingDown = useRef(false);
-  const searchBarTranslateY = useRef(new Animated.Value(0)).current;
-  const velocityThreshold = 0.5;
-  const distanceThreshold = 10;
-
-  const handleScroll = Animated.event(
-    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-    { 
-      useNativeDriver: true,
-      listener: (event: any) => {
-        const currentScrollY = event.nativeEvent.contentOffset.y;
-        const velocity = (currentScrollY - lastScrollY.current) / 16; // 16ms es aproximadamente un frame
-        const distance = Math.abs(currentScrollY - lastScrollY.current);
-        
-        if (distance > distanceThreshold) {
-          const isMovingDown = currentScrollY > lastScrollY.current;
-          
-          // Solo cambiamos la dirección si la velocidad supera el umbral
-          if (Math.abs(velocity) > velocityThreshold && isMovingDown !== isScrollingDown.current) {
-            isScrollingDown.current = isMovingDown;
-            
-            // Animar la barra de búsqueda
-            Animated.spring(searchBarTranslateY, {
-              toValue: isMovingDown ? -searchBarHeight - 20 : 0,
-              useNativeDriver: true,
-              damping: 20,
-              mass: 0.8,
-              stiffness: 120,
-              overshootClamping: true
-            }).start();
-          }
-        }
-        
-        lastScrollY.current = currentScrollY;
-      }
+  // Actualizamos las coordenadas cuando cambie la ubicación del usuario
+  useEffect(() => {
+    if (location.latitude && location.longitude) {
+      setCurrentCoords({
+        latitude: location.latitude,
+        longitude: location.longitude,
+      });
     }
-  );
+  }, [location.latitude, location.longitude]);
 
-  // Determinar el color de fondo basado en el clima actual
-  const getBackgroundColors = () => {
-    if (!current || !current.weather[0]) {
-      return isDark 
-        ? ['#1c1c1e', '#2c2c2e'] 
-        : ['#f2f2f7', '#e5e5ea'];
-    }
+  const {
+    current,
+    forecast,
+    isLoading,
+    error,
+    searchByCity,
+    refreshWeather,
+    cityName,
+    country,
+  } = useWeather(currentCoords.latitude, currentCoords.longitude);
 
-    const weatherIcon = current.weather[0].icon;
-    const weatherInfo = weatherConditions[weatherIcon];
-    
-    if (!weatherInfo) {
-      return isDark 
-        ? ['#1c1c1e', '#2c2c2e'] 
-        : ['#f2f2f7', '#e5e5ea'];
-    }
+  // Animation values
+  const scrollY = useSharedValue(0);
+  const searchBarOffset = useSharedValue(0);
 
-    // Extraer color de fondo del tiempo actual y generar un gradiente
-    const baseColor = weatherInfo.bgColor;
-    
-    if (weatherIcon.includes('n')) {
-      // Colores nocturnos
-      return ['#191970', '#000033'];
-    } else {
-      // Colores diurnos basados en el clima
-      switch (weatherIcon.substring(0, 2)) {
-        case '01': // Despejado
-          return ['#87CEEB', '#1E90FF'];
-        case '02': // Parcialmente nublado
-        case '03': // Nublado
-          return ['#87CEEB', '#778899'];
-        case '04': // Muy nublado
-          return ['#778899', '#708090'];
-        case '09': // Lluvia ligera
-        case '10': // Lluvia
-          return ['#4682B4', '#483D8B'];
-        case '11': // Tormenta
-          return ['#2F4F4F', '#191970'];
-        case '13': // Nieve
-          return ['#B0C4DE', '#4682B4'];
-        case '50': // Niebla
-          return ['#A9A9A9', '#778899'];
-        default:
-          return isDark 
-            ? ['#1c1c1e', '#2c2c2e'] 
-            : ['#f2f2f7', '#e5e5ea'];
-      }
-    }
+  // Handle scroll events
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.value = event.contentOffset.y;
+    },
+  });
+
+  // Animated styles for SearchBar
+  const searchBarStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      scrollY.value,
+      [0, 100],
+      [1, 0.7],
+      Extrapolate.CLAMP
+    );
+
+    const translateY = interpolate(
+      scrollY.value,
+      [0, 100],
+      [0, -20],
+      Extrapolate.CLAMP
+    );
+
+    return {
+      opacity,
+      transform: [{ translateY }],
+    };
+  });
+
+  // Handle location change from LocationManager
+  const handleLocationChange = (lat: number, lon: number) => {
+    setCurrentCoords({
+      latitude: lat,
+      longitude: lon,
+    });
   };
 
-  const backgroundColors = getBackgroundColors();
-
   return (
-    <>
-      <StatusBar barStyle="light-content" />
-      <LinearGradient
-        colors={backgroundColors}
-        style={styles.container}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-      >
-        <SafeAreaView style={styles.safeArea}>
-          <Animated.View style={[
-            styles.searchBarContainer,
-            {
-              transform: [{ translateY: searchBarTranslateY }],
-              opacity: scrollY.interpolate({
-                inputRange: [0, 50],
-                outputRange: [1, 0.95],
-                extrapolate: 'clamp'
-              })
-            }
-          ]}>
-            <SearchBar 
-              onSearch={searchByCity} 
-              isLoading={isLoading}
-            />
-          </Animated.View>
+    <View style={styles.container}>
+      <StatusBar
+        barStyle="light-content"
+        translucent
+        backgroundColor="transparent"
+      />
 
-          <Animated.ScrollView
-            style={styles.scrollView}
-            contentContainerStyle={styles.contentContainer}
-            showsVerticalScrollIndicator={false}
-            onScroll={handleScroll}
-            scrollEventThrottle={16}
-            bounces={false}
-            refreshControl={
-              <RefreshControl
-                refreshing={isLoading}
-                onRefresh={refreshWeather}
-                tintColor="#fff"
-              />
-            }
-          >
-            {error ? (
-              <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>{error}</Text>
-              </View>
-            ) : (
-              <>
-                <CurrentWeather weatherData={current} isLoading={isLoading} />
-                <HourlyForecast forecastData={forecast} isLoading={isLoading} />
-                <DailyForecast forecastData={forecast} isLoading={isLoading} />
-              </>
-            )}
-          </Animated.ScrollView>
-        </SafeAreaView>
-      </LinearGradient>
-    </>
+      {/* Fondo animado según el clima */}
+      <AnimatedWeatherBackground weatherData={current} isLoading={isLoading} />
+
+      <SafeAreaView style={styles.safeArea}>
+        {/* Barra de búsqueda animada */}
+        <Animated.View style={[styles.searchBarContainer, searchBarStyle]}>
+          <SearchBar onSearch={searchByCity} isLoading={isLoading} />
+        </Animated.View>
+
+        {/* Gestor de ubicaciones */}
+        <LocationManager
+          currentLocation={{
+            latitude: currentCoords.latitude,
+            longitude: currentCoords.longitude,
+            cityName: cityName,
+            country: country,
+          }}
+          onLocationChange={handleLocationChange}
+        />
+
+        {/* Contenido principal con scroll */}
+        <Animated.ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          onScroll={scrollHandler}
+          scrollEventThrottle={16}
+          refreshControl={
+            <RefreshControl
+              refreshing={isLoading}
+              onRefresh={refreshWeather}
+              tintColor="#fff"
+              title="Actualizando"
+              titleColor="#fff"
+            />
+          }
+          bounces={true}
+        >
+          {/* Clima actual */}
+          <CurrentWeather
+            weatherData={current}
+            isLoading={isLoading}
+            error={error}
+          />
+
+          {/* Pronóstico por horas */}
+          <HourlyForecast forecastData={forecast} isLoading={isLoading} />
+
+          {/* Estadísticas del clima */}
+          <WeatherStats
+            weatherData={current}
+            forecastData={forecast}
+            isLoading={isLoading}
+          />
+
+          {/* Pronóstico de días futuros */}
+          <DailyForecast forecastData={forecast} isLoading={isLoading} />
+
+          <View style={styles.bottomPadding} />
+        </Animated.ScrollView>
+      </SafeAreaView>
+    </View>
   );
 }
 
-const { height } = Dimensions.get('window');
+const { height } = Dimensions.get("window");
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#000", // Fallback color
   },
   safeArea: {
     flex: 1,
   },
   searchBarContainer: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 50 : 20,
+    position: "absolute",
+    top: Platform.OS === "ios" ? 50 : 20,
     left: 0,
     right: 0,
     zIndex: 100,
-    height: 70,
+    paddingHorizontal: 16,
   },
   scrollView: {
     flex: 1,
   },
-  contentContainer: {
-    paddingTop: 90, // Reducido de 120
+  scrollContent: {
+    paddingTop: 130,
     paddingBottom: 30,
   },
   errorContainer: {
     flex: 1,
     height: height * 0.5,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
   },
-  errorText: {
-    color: 'white',
-    fontSize: 18,
-    textAlign: 'center',
-    fontWeight: '500',
+  bottomPadding: {
+    height: 40,
   },
 });

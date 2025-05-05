@@ -1,29 +1,39 @@
-import React from 'react';
-import { StyleSheet, View, Text, ScrollView, StatusBar, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
-import { Ionicons } from '@expo/vector-icons';
+import React from "react";
+import {
+  StyleSheet,
+  View,
+  Text,
+  ScrollView,
+  StatusBar,
+  Platform,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
+import { Ionicons } from "@expo/vector-icons";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   interpolate,
   Extrapolate,
-} from 'react-native-reanimated';
+} from "react-native-reanimated";
 
-import { useLocation } from '../../hooks/useLocation';
-import { useWeather } from '../../hooks/useWeather';
-import { useColorScheme } from '../../hooks/useColorScheme';
-import { Colors } from '../../constants/Colors';
+import { useLocation } from "../../hooks/useLocation";
+import { useWeather } from "../../hooks/useWeather";
+import { useColorScheme } from "../../hooks/useColorScheme";
+import { Colors } from "../../constants/Colors";
 
 export default function ExploreScreen() {
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const isDark = colorScheme === "dark";
   const location = useLocation();
-  const { current, isLoading } = useWeather(location.latitude, location.longitude);
+  const { current, isLoading } = useWeather(
+    location.latitude,
+    location.longitude
+  );
   const scrollY = useSharedValue(0);
 
-  const renderDetailCard = ({ title, value, units = '', icon }: any) => {
+  const renderDetailCard = ({ title, value, units = "", icon }: any) => {
     const animatedStyle = useAnimatedStyle(() => {
       const scale = interpolate(
         scrollY.value,
@@ -31,31 +41,45 @@ export default function ExploreScreen() {
         [1, 0.98],
         Extrapolate.CLAMP
       );
-      
+
       return {
-        transform: [{ scale }]
+        transform: [{ scale }],
       };
     });
 
     return (
       <Animated.View style={[styles.detailCard, animatedStyle]}>
         <BlurView
-          tint={isDark ? 'dark' : 'light'}
+          tint={isDark ? "dark" : "light"}
           intensity={isDark ? 40 : 60}
           style={[
             styles.cardContent,
-            { borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }
+            {
+              borderWidth: 1,
+              borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)",
+            },
           ]}
         >
-          <Ionicons 
-            name={icon} 
-            size={24} 
-            color={isDark ? Colors.dark.text : Colors.light.text} 
+          <Ionicons
+            name={icon}
+            size={24}
+            color={isDark ? Colors.dark.text : Colors.light.text}
           />
-          <Text style={[styles.detailValue, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
-            {value}{units}
+          <Text
+            style={[
+              styles.detailValue,
+              { color: isDark ? Colors.dark.text : Colors.light.text },
+            ]}
+          >
+            {value}
+            {units}
           </Text>
-          <Text style={[styles.detailTitle, { color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)' }]}>
+          <Text
+            style={[
+              styles.detailTitle,
+              { color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.7)" },
+            ]}
+          >
             {title}
           </Text>
         </BlurView>
@@ -66,12 +90,17 @@ export default function ExploreScreen() {
   if (isLoading || !current) {
     return (
       <LinearGradient
-        colors={isDark ? ['#1c1c1e', '#2c2c2e'] : ['#f2f2f7', '#e5e5ea']}
+        colors={isDark ? ["#1c1c1e", "#2c2c2e"] : ["#f2f2f7", "#e5e5ea"]}
         style={styles.container}
       >
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.loadingContainer}>
-            <Text style={[styles.loadingText, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+            <Text
+              style={[
+                styles.loadingText,
+                { color: isDark ? Colors.dark.text : Colors.light.text },
+              ]}
+            >
               Cargando información...
             </Text>
           </View>
@@ -82,45 +111,45 @@ export default function ExploreScreen() {
 
   const details = [
     {
-      title: 'Humedad',
+      title: "Humedad",
       value: current.main.humidity,
-      units: '%',
-      icon: 'water-outline'
+      units: "%",
+      icon: "water-outline",
     },
     {
-      title: 'Viento',
+      title: "Viento",
       value: Math.round(current.wind.speed * 3.6),
-      units: ' km/h',
-      icon: 'speedometer-outline'
+      units: " km/h",
+      icon: "speedometer-outline",
     },
     {
-      title: 'Presión',
+      title: "Presión",
       value: current.main.pressure,
-      units: ' hPa',
-      icon: 'thermometer-outline'
+      units: " hPa",
+      icon: "thermometer-outline",
     },
     {
-      title: 'Visibilidad',
+      title: "Visibilidad",
       value: (current.visibility / 1000).toFixed(1),
-      units: ' km',
-      icon: 'eye-outline'
+      units: " km",
+      icon: "eye-outline",
     },
     {
-      title: 'Nubosidad',
+      title: "Nubosidad",
       value: current.clouds.all,
-      units: '%',
-      icon: 'cloud-outline'
+      units: "%",
+      icon: "cloud-outline",
     },
     {
-      title: 'Sensación',
+      title: "Sensación",
       value: Math.round(current.main.feels_like),
-      units: '°',
-      icon: 'body-outline'
-    }
+      units: "°",
+      icon: "body-outline",
+    },
   ];
 
   const handleScroll = (event: any) => {
-    'worklet';
+    "worklet";
     scrollY.value = event.nativeEvent.contentOffset.y;
   };
 
@@ -141,7 +170,7 @@ export default function ExploreScreen() {
 
     return {
       opacity,
-      transform: [{ translateY }]
+      transform: [{ translateY }],
     };
   });
 
@@ -149,12 +178,17 @@ export default function ExploreScreen() {
     <>
       <StatusBar barStyle="light-content" />
       <LinearGradient
-        colors={isDark ? ['#1c1c1e', '#2c2c2e'] : ['#f2f2f7', '#e5e5ea']}
+        colors={isDark ? ["#1c1c1e", "#2c2c2e"] : ["#f2f2f7", "#e5e5ea"]}
         style={styles.container}
       >
         <SafeAreaView style={styles.safeArea}>
           <Animated.View style={[styles.header, headerStyle]}>
-            <Text style={[styles.headerTitle, { color: isDark ? Colors.dark.text : Colors.light.text }]}>
+            <Text
+              style={[
+                styles.headerTitle,
+                { color: isDark ? Colors.dark.text : Colors.light.text },
+              ]}
+            >
               Detalles del clima
             </Text>
           </Animated.View>
@@ -167,9 +201,7 @@ export default function ExploreScreen() {
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.gridContainer}>
-              {details.map((detail, index) => (
-                renderDetailCard(detail)
-              ))}
+              {details.map((detail, index) => renderDetailCard(detail))}
             </View>
           </Animated.ScrollView>
         </SafeAreaView>
@@ -187,11 +219,11 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 16,
-    paddingTop: Platform.OS === 'ios' ? 0 : 16,
+    paddingTop: Platform.OS === "ios" ? 0 : 16,
   },
   headerTitle: {
     fontSize: 28,
-    fontWeight: '700',
+    fontWeight: "700",
     letterSpacing: -0.5,
   },
   scrollView: {
@@ -202,13 +234,13 @@ const styles = StyleSheet.create({
     paddingTop: 0,
   },
   gridContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
     gap: 16,
   },
   detailCard: {
-    width: '47%',
+    width: "47%",
     aspectRatio: 1,
     marginBottom: 16,
   },
@@ -216,28 +248,28 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 24,
     padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
   },
   detailTitle: {
     fontSize: 15,
     marginTop: 8,
-    textAlign: 'center',
+    textAlign: "center",
   },
   detailValue: {
     fontSize: 24,
-    fontWeight: '600',
+    fontWeight: "600",
     marginTop: 12,
-    textAlign: 'center',
+    textAlign: "center",
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingText: {
     fontSize: 18,
-    fontWeight: '500',
+    fontWeight: "500",
   },
 });

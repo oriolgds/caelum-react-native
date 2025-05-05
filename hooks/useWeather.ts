@@ -12,6 +12,8 @@ interface WeatherState {
   error: string | null;
   isLoading: boolean;
   cityName: string | null;
+  country: string | null;
+  lastUpdated: Date | null;
 }
 
 export const useWeather = (
@@ -24,6 +26,8 @@ export const useWeather = (
     error: null,
     isLoading: true,
     cityName: null,
+    country: null,
+    lastUpdated: null,
   });
 
   const fetchWeatherData = async (lat: number, lon: number) => {
@@ -42,6 +46,8 @@ export const useWeather = (
         error: null,
         isLoading: false,
         cityName: currentData.name,
+        country: currentData.sys.country,
+        lastUpdated: new Date(),
       });
     } catch (error) {
       setWeatherState((prev) => ({
@@ -76,6 +82,27 @@ export const useWeather = (
       fetchWeatherData(latitude, longitude);
     }
   }, [latitude, longitude]);
+
+  // Comprobar si los datos son antiguos (más de 30 minutos)
+  const isDataStale = () => {
+    if (!weatherState.lastUpdated) return true;
+    const now = new Date();
+    const timeDiff = now.getTime() - weatherState.lastUpdated.getTime();
+    return timeDiff > 30 * 60 * 1000; // 30 minutos en milisegundos
+  };
+
+  // Recarga automática de datos si son antiguos
+  useEffect(() => {
+    const checkDataFreshness = () => {
+      if (isDataStale() && latitude !== null && longitude !== null) {
+        fetchWeatherData(latitude, longitude);
+      }
+    };
+
+    const interval = setInterval(checkDataFreshness, 60000); // Comprobar cada minuto
+
+    return () => clearInterval(interval);
+  }, [weatherState.lastUpdated, latitude, longitude]);
 
   return {
     ...weatherState,
